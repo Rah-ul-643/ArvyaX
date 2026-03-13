@@ -7,6 +7,7 @@ async function getCachedAnalysis(hash) {
   if (!data) return null;
 
   return JSON.parse(data);
+
 }
 
 async function storeAnalysis(hash, result) {
@@ -14,10 +15,10 @@ async function storeAnalysis(hash, result) {
   await redis.set(
     hash,
     JSON.stringify(result),
-    {
-      EX: 60 * 60 * 24 // 24 hours
-    }
+    "EX",
+    60 * 60 * 24 // 24 hours
   );
+
 }
 
 module.exports = {

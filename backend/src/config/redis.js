@@ -1,9 +1,15 @@
-const { createClient } = require("redis");
+const IORedis = require("ioredis");
 
-const client = createClient({
-  url: process.env.REDIS_URL
+const connection = new IORedis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: null
 });
 
-client.connect();
+connection.on("connect", () => {
+  console.log("Connected to Redis");
+});
 
-module.exports = client;
+connection.on("error", (err) => {
+  console.error("Redis error:", err);
+});
+
+module.exports = connection;

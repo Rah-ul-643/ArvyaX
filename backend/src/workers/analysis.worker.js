@@ -1,40 +1,62 @@
+require("dotenv").config();
+
+const connectDB = require("../config/db"); 
+
 const { Worker } = require("bullmq");
-const redis = require("../config/redis");
+const connection = require("../config/redis");
 
 const Journal = require("../models/Journal");
 
-const { analyzeText } =
-require("../services/llm.service");
+const { analyzeText } = require("../services/llm.service");
+const { decrypt } = require("../utils/encryption");
 
-const { decrypt } =
-require("../utils/encryption");
+// connect to Mongo DB before starting the worker
+connectDB();
 
 const worker = new Worker(
   "journal-analysis",
 
-  async job => {
+  async (job) => {
 
-    const { journalId } = job.data;
+    try {
 
-    const journal = await Journal.findById(journalId);
+      const { journalId } = job.data;
 
-    const text = decrypt(journal.text);
+      console.log("Processing journal:", journalId);
 
-    const result = await analyzeText(text);
+      const journal = await Journal.findById(journalId);
 
-    await Journal.findByIdAndUpdate(
-      journalId,
-      {
-        emotion: result.emotion,
-        keywords: result.keywords,
-        summary: result.summary,
-        analysisStatus: "complete"
+      if (!journal) {
+        throw new Error("Journal not found");
       }
-    );
+
+      const text = decrypt(journal.text);
+
+      const result = await analyzeText(text);
+
+      await Journal.findByIdAndUpdate(
+        journalId,
+        {
+          emotion: result.emotion,
+          keywords: result.keywords,
+          summary: result.summary,
+          analysisStatus: "complete"
+        }
+      );
+
+      console.log("Analysis complete:", journalId);
+
+    } catch (err) {
+
+      console.error("Worker error:", err);
+
+      throw err;
+
+    }
 
   },
 
-  { connection: redis }
+  { connection }
 );
 
 console.log("Worker started");

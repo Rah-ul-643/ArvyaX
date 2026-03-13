@@ -15,63 +15,107 @@ function hashText(text) {
 
 }
 
-async function analyzeText(text) {
+function extractJSON(content) {
 
-  const hash = hashText(text);
+  // remove markdown blocks
+  let cleaned = content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-  // Check cache
-  const cached = await getCachedAnalysis(hash);
+  const match = cleaned.match(/\{[\s\S]*\}/);
 
-  if (cached) {
-    console.log("CACHE HIT");
-    return cached;
+  if (!match) {
+    throw new Error("LLM did not return valid JSON");
   }
 
-  console.log("CACHE MISS -> calling LLM");
+  return JSON.parse(match[0]);
 
-  const prompt = `
-You are an emotion analysis assistant.
-
-Extract:
-emotion
-keywords (3-5)
-summary
-
-Return STRICT JSON:
-{
-"emotion":"",
-"keywords":[],
-"summary":""
 }
 
-Journal:
+async function analyzeText(text) {
+
+  try {
+
+    const hash = hashText(text);
+
+    // check cache
+    const cached = await getCachedAnalysis(hash);
+
+    if (cached) {
+      console.log("CACHE HIT");
+      return cached;
+    }
+
+    console.log("CACHE MISS -> calling LLM");
+
+    const prompt = `
+You are an emotion analysis assistant.
+
+Extract the following fields from the journal entry.
+
+emotion
+keywords (3-5 words)
+summary
+
+Return ONLY a JSON object in this format.
+
+{
+  "emotion": "",
+  "keywords": [],
+  "summary": ""
+}
+
+Do not include markdown or explanations.
+
+Journal entry:
 ${text}
 `;
 
-  const response = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "user", content: prompt }
-      ],
-      temperature: 0
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_KEY}`
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
+    );
+
+    const content = response.data.choices[0].message.content;
+
+    console.log("RAW LLM RESPONSE:", content);
+
+    const result = extractJSON(content);
+
+    // store in cache
+    await storeAnalysis(hash, result);
+
+    return result;
+
+  } catch (err) {
+
+    console.error("LLM ERROR:");
+
+    if (err.response) {
+      console.error(err.response.data);
+    } else {
+      console.error(err.message);
     }
-  );
 
-  const result = JSON.parse(
-    response.data.choices[0].message.content
-  );
+    throw err;
 
-  // store in cache
-  await storeAnalysis(hash, result);
-
-  return result;
+  }
 
 }
 
