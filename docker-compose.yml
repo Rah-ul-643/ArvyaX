@@ -2,6 +2,7 @@ services:
 
   api:
     build: ./backend
+    container_name: journal-api
     ports:
       - "5000:5000"
     env_file:
@@ -9,29 +10,43 @@ services:
     depends_on:
       - mongo
       - redis
+    restart: unless-stopped
 
   worker:
     build: ./backend
+    container_name: journal-worker
     command: node src/workers/analysis.worker.js
     env_file:
       - .env
     depends_on:
       - mongo
       - redis
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend/arvyax-journal
+    build: ./frontend
+    container_name: journal-frontend
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     depends_on:
       - api
+    restart: unless-stopped
 
   mongo:
-    image: mongo
+    image: mongo:7
+    container_name: journal-mongo
     ports:
       - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
 
   redis:
-    image: redis
+    image: redis:7
+    container_name: journal-redis
     ports:
       - "6379:6379"
+
+volumes:
+  mongo_data:
