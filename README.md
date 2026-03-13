@@ -92,9 +92,9 @@ The easiest way to run the system is using Docker.
 
 Step 1 - Clone the repository 
 
- -> git clone <repo-url>
+ -> git clone https://github.com/Rah-ul-643/ArvyaX.git
 
- -> cd project
+ -> cd ArvyaX
 
 Step 2 - Create environment file
 
